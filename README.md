@@ -1,3 +1,4 @@
+
 # Intel Image Classifier
 
 A web application that classifies natural scene images into 6 categories using CNN models trained with both **PyTorch** and **TensorFlow**.
@@ -120,3 +121,7 @@ Push to a Space with `SDK: gradio` or `SDK: docker`. See the live demo above.
 | Pillow | 10.4.0 |
 | NumPy | 1.26.4 |
 | Gunicorn | 22.0.0 |
+=======
+# image_intel
+image classification on the world
+
