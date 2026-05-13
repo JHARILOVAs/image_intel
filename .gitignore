@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Vim swap files
+*.swp
+*.swo
+
+# Trained model weights (large binary files — store on HuggingFace Hub or Git LFS)
+models/*.pth
+models/*.keras
+models/*.h5
+models/*.pt
+
+# Dataset (download separately from Kaggle)
+archive/
+
+# Flask uploads
+static/uploads/*
+!static/uploads/.gitkeep
+
+# Environment variables
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# macOS
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/

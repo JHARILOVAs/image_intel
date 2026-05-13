@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Intel Image Classifier — Julianna</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+</head>
+<body>
+
+  <!-- Background blobs -->
+  <div class="bg-blob blob-1"></div>
+  <div class="bg-blob blob-2"></div>
+  <div class="bg-blob blob-3"></div>
+
+  <div class="page-wrapper">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-badge">Intel Image Classification</div>
+      <h1 class="header-title">Classify<br/><em>the world</em></h1>
+      <p class="header-sub">Upload an image · choose a model · discover the scene</p>
+    </header>
+
+    <!-- Card -->
+    <main class="card">
+
+      <!-- Model selector -->
+      <div class="field-group">
+        <label class="field-label" for="model-select">Model</label>
+        <div class="select-wrapper">
+          <select id="model-select" class="select">
+            <option value="pytorch" {% if not pytorch_ok %}disabled{% endif %}>
+              PyTorch CNN  {% if not pytorch_ok %}(unavailable){% endif %}
+            </option>
+            <option value="tensorflow" {% if not tensorflow_ok %}disabled{% endif %}>
+              TensorFlow CNN  {% if not tensorflow_ok %}(unavailable){% endif %}
+            </option>
+          </select>
+          <svg class="select-chevron" viewBox="0 0 20 20" fill="none">
+            <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Upload zone -->
+      <div class="field-group">
+        <label class="field-label">Image</label>
+        <div class="drop-zone" id="drop-zone">
+          <input type="file" id="file-input" accept="image/*" class="file-input"/>
+          <div class="drop-inner" id="drop-inner">
+            <div class="drop-icon">
+              <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="8" y="8" width="32" height="32" rx="8" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M24 20v12M18 26l6-6 6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M8 34l8-8 6 6 4-4 8 10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>
+              </svg>
+            </div>
+            <p class="drop-text">Drop an image here</p>
+            <p class="drop-hint">or <span class="drop-link">browse files</span></p>
+          </div>
+          <!-- Preview -->
+          <img id="preview-img" class="preview-img hidden" alt="Preview"/>
+        </div>
+      </div>
+
+      <!-- Submit button -->
+      <button class="btn-classify" id="btn-classify" disabled>
+        <span class="btn-text">Classify Image</span>
+        <span class="btn-loader hidden"></span>
+      </button>
+
+      <!-- Result panel -->
+      <div class="result-panel hidden" id="result-panel">
+        <div class="result-top">
+          <div class="result-emoji" id="result-emoji"></div>
+          <div class="result-info">
+            <div class="result-label" id="result-label"></div>
+            <div class="result-meta" id="result-meta"></div>
+          </div>
+        </div>
+        <!-- Confidence bars -->
+        <div class="bars" id="bars"></div>
+      </div>
+
+      <!-- Error panel -->
+      <div class="error-panel hidden" id="error-panel">
+        <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+          <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M10 6v5M10 13.5v.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <span id="error-msg"></span>
+      </div>
+
+    </main>
+
+    <!-- Classes legend -->
+    <div class="legend">
+      <div class="legend-item">🏙️ Buildings</div>
+      <div class="legend-item">🌲 Forest</div>
+      <div class="legend-item">🧊 Glacier</div>
+      <div class="legend-item">⛰️ Mountain</div>
+      <div class="legend-item">🌊 Sea</div>
+      <div class="legend-item">🛣️ Street</div>
+    </div>
+
+    <footer class="footer">Julianna · Intel Image Classification Project · 2026</footer>
+  </div>
+
+  <script>
+    const dropZone   = document.getElementById('drop-zone');
+    const fileInput  = document.getElementById('file-input');
+    const dropInner  = document.getElementById('drop-inner');
+    const previewImg = document.getElementById('preview-img');
+    const btnClassify = document.getElementById('btn-classify');
+    const btnText    = document.querySelector('.btn-text');
+    const btnLoader  = document.querySelector('.btn-loader');
+    const resultPanel = document.getElementById('result-panel');
+    const errorPanel  = document.getElementById('error-panel');
+
+    let selectedFile = null;
+
+    // Click on drop zone → open file picker
+    dropZone.addEventListener('click', (e) => {
+      if (!e.target.closest('select') && !e.target.closest('.btn-classify'))
+        fileInput.click();
+    });
+
+    // Drag & drop
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith('image/')) setFile(file);
+    });
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files[0]) setFile(fileInput.files[0]);
+    });
+
+    function setFile(file) {
+      selectedFile = file;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        previewImg.src = e.target.result;
+        previewImg.classList.remove('hidden');
+        dropInner.classList.add('hidden');
+      };
+      reader.readAsDataURL(file);
+      btnClassify.disabled = false;
+      resultPanel.classList.add('hidden');
+      errorPanel.classList.add('hidden');
+    }
+
+    // Classify
+    btnClassify.addEventListener('click', async () => {
+      if (!selectedFile) return;
+      btnText.classList.add('hidden');
+      btnLoader.classList.remove('hidden');
+      btnClassify.disabled = true;
+      resultPanel.classList.add('hidden');
+      errorPanel.classList.add('hidden');
+
+      const formData = new FormData();
+      formData.append('image', selectedFile);
+      formData.append('model', document.getElementById('model-select').value);
+
+      try {
+        const res  = await fetch('/predict', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (data.error) {
+          document.getElementById('error-msg').textContent = data.error;
+          errorPanel.classList.remove('hidden');
+        } else {
+          document.getElementById('result-emoji').textContent = data.emoji;
+          document.getElementById('result-label').textContent = data.label.charAt(0).toUpperCase() + data.label.slice(1);
+          document.getElementById('result-meta').textContent =
+            `${data.confidence.toFixed(1)}% confidence · ${data.model_used === 'pytorch' ? 'PyTorch' : 'TensorFlow'}`;
+          renderBars(data.all_probs);
+          resultPanel.classList.remove('hidden');
+        }
+      } catch (err) {
+        document.getElementById('error-msg').textContent = 'Network error. Please try again.';
+        errorPanel.classList.remove('hidden');
+      } finally {
+        btnText.classList.remove('hidden');
+        btnLoader.classList.add('hidden');
+        btnClassify.disabled = false;
+      }
+    });
+
+    function renderBars(probs) {
+      const barsEl = document.getElementById('bars');
+      barsEl.innerHTML = '';
+      const sorted = Object.entries(probs).sort((a, b) => b[1] - a[1]);
+      const emojis = { buildings:'🏙️', forest:'🌲', glacier:'🧊', mountain:'⛰️', sea:'🌊', street:'🛣️' };
+      sorted.forEach(([cls, pct], i) => {
+        barsEl.innerHTML += `
+          <div class="bar-row" style="animation-delay:${i * 60}ms">
+            <div class="bar-label">${emojis[cls]} ${cls}</div>
+            <div class="bar-track">
+              <div class="bar-fill ${i === 0 ? 'bar-top' : ''}" style="width:${Math.max(pct, 0.5)}%"></div>
+            </div>
+            <div class="bar-pct">${pct.toFixed(1)}%</div>
+          </div>`;
+      });
+    }
+  </script>
+
+</body>
+</html>
